@@ -17,6 +17,7 @@
 package dependencies
 
 import (
+	"errors"
 	"fmt"
 	"go/parser"
 	"go/token"
@@ -35,6 +36,30 @@ type DepsBuilder struct {
 	SkipSubdirs   []string
 	BlackList     []string
 	internal      *internalBuilder
+}
+
+type MultiDepsBuilder struct {
+	builders []*DepsBuilder
+}
+
+func NewMultiDepsBuilder() *MultiDepsBuilder {
+	return &MultiDepsBuilder{}
+}
+
+func (b *MultiDepsBuilder) Ingest(db *DepsBuilder) {
+	b.builders = append(b.builders, db)
+}
+
+func (b *MultiDepsBuilder) GetFullDependencyGraph() (Graph, error) {
+	graphs := make([]Graph, 0)
+	for _, b := range b.builders {
+		g, err := b.GetFullDependencyGraph()
+		if err != nil {
+			return nil, err
+		}
+		graphs = append(graphs, g)
+	}
+	return combineGraphs(graphs)
 }
 
 type internalBuilder struct {
@@ -81,6 +106,20 @@ type Node struct {
 
 type Graph map[string]*Node
 
+func combineGraphs(graphs []Graph) (Graph, error) {
+	res := make(map[string]*Node)
+
+	for _, g := range graphs {
+		for k, v := range g {
+			if _, ok := res[k]; ok {
+				return res, errors.New("duplicate key in graph combination")
+			}
+			res[k] = v
+		}
+	}
+	return Graph(res), nil
+}
+
 type GraphNormalizer func(path string) string
 
 func (g Graph) Normalize(n GraphNormalizer) Graph {
@@ -125,7 +164,7 @@ func (g Graph) TransitiveClosure(node string) []string {
 
 		next := g[item]
 		if next == nil {
-			panic("oops " + node + "\n" + fmt.Sprintf("%#v", g))
+			panic("oopsie " + item + "\n" + fmt.Sprintf("%#v", g))
 		}
 		for _, n := range next.Imports {
 			if visited[n] {
@@ -194,11 +233,6 @@ func (b *internalBuilder) getFullDependencyGraph() (Graph, error) {
 	m := make(map[string]string)
 MAINLOOP:
 	for _, d := range dirs {
-		if strings.HasPrefix(d, "vendor/") {
-			m[d] = strings.TrimPrefix(d, "vendor/")
-			continue
-		}
-
 		for k, _ := range b.SkipSubdirs {
 			srcPfx := filepath.Join(k, "src") + "/"
 			if strings.HasPrefix(d, srcPfx) {
@@ -211,9 +245,13 @@ MAINLOOP:
 			}
 		}
 
+		if strings.HasPrefix(d, "vendor/") {
+			m[d] = strings.TrimPrefix(d, "vendor/")
+			continue
+		}
+
 		m[d] = filepath.Join(b.Package, d)
 	}
-
 	g := make(map[string]*Node)
 	for k, v := range m {
 		subdeps, err := b.packageAllDeps(filepath.Join(b.Root, k))

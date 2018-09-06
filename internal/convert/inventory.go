@@ -44,8 +44,8 @@ func (i *Inventory) GetSubmodules() []*Module {
 	return res
 }
 
-func (i *Inventory) GetSubmodulesFor(mod string) []*Module {
-	res := make([]*Module, 0)
+func (i *Inventory) GetSubmodulesFor(mod string) []string {
+	res := make([]string, 0)
 
 	g, err := i.getFullDependencyGraph()
 	if err != nil {
@@ -53,24 +53,14 @@ func (i *Inventory) GetSubmodulesFor(mod string) []*Module {
 	}
 
 	mods := i.GetSubmodules()
-	var norm dependencies.GraphNormalizer = func(path string) string {
-		for _, m := range mods {
-			if strings.HasPrefix(path, m.Path+"/") {
-				return m.Path
-			}
-		}
-		return path
-	}
-
-	ng := g.Normalize(norm)
-	clos := ng.TransitiveClosure(mod)
+	clos := g.RecursiveTransitiveClosure(mod)
 	for _, m := range mods {
 		if m.Path == mod {
 			continue
 		}
 		for _, c := range clos {
-			if c == m.Path {
-				res = append(res, m)
+			if c == m.Path || strings.HasPrefix(c, m.Path+"/") {
+				res = append(res, m.Path)
 				break
 			}
 		}
@@ -153,26 +143,45 @@ func (i *Inventory) getFullDependencyGraph() (dependencies.Graph, error) {
 	if i.g != nil {
 		return i.g, nil
 	}
+
+	b := dependencies.NewMultiDepsBuilder()
+
 	mods := i.GetSubmodules()
 	localPackages := make([]string, 0)
 	skipSubdirs := make([]string, 0)
 	for _, m := range mods {
 		localPackages = append(localPackages, m.Path)
 		if strings.HasPrefix(m.Replace.Dir, i.RootDir) {
-			skipSubdirs = append(skipSubdirs, m.Replace.Dir)
+			relpath, _ := filepath.Rel(i.RootDir, m.Replace.Dir)
+			skipSubdirs = append(skipSubdirs, relpath)
 		}
+		b.Ingest(&dependencies.DepsBuilder{
+			Root:        m.Replace.Dir,
+			Package:     m.Path,
+			SkipSubdirs: []string{"vendor"},
+		})
 	}
+	skipSubdirs = append(skipSubdirs, "vendor")
 
-	b := &dependencies.DepsBuilder{
+	mainBuilder := &dependencies.DepsBuilder{
 		Root:          i.RootDir,
 		Package:       i.GetMainModule().Path,
 		LocalPackages: localPackages,
 		SkipSubdirs:   skipSubdirs,
 	}
 
+	b.Ingest(mainBuilder)
+
+	for _, m := range i.GetExternalDependencies() {
+		b.Ingest(&dependencies.DepsBuilder{
+			Root:    m.Dir,
+			Package: m.Path,
+		})
+	}
+
 	g, err := b.GetFullDependencyGraph()
 
-	// TODO(yhodique) don't hardcode this...
+	// TODO(yhodique) don't hardcode this... Actually shouldn't be needed ?
 	g = g.Normalize(func(path string) string {
 		if strings.HasPrefix(path, "k8s.io/kubernetes/staging/src/") {
 			return strings.TrimPrefix(path, "k8s.io/kubernetes/staging/src/")

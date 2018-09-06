@@ -99,10 +99,10 @@ func (r *VgoRunner) GenVgoMod(mod string) error {
 
 	subs := make([]*Module, 0)
 	for _, m := range inv.GetSubmodulesFor(mod) {
-		if m.Path == thisMod.Path {
+		if m == thisMod.Path {
 			continue
 		}
-		subs = append(subs, m)
+		subs = append(subs, inv.GetModule(m))
 	}
 	sort.Slice(subs, func(i, j int) bool {
 		return subs[i].Path < subs[j].Path

@@ -169,7 +169,6 @@ func (i *Inventory) getFullDependencyGraph() (dependencies.Graph, error) {
 		LocalPackages: localPackages,
 		SkipSubdirs:   skipSubdirs,
 	}
-
 	b.Ingest(mainBuilder)
 
 	for _, m := range i.GetExternalDependencies() {
@@ -180,14 +179,6 @@ func (i *Inventory) getFullDependencyGraph() (dependencies.Graph, error) {
 	}
 
 	g, err := b.GetFullDependencyGraph()
-
-	// TODO(yhodique) don't hardcode this... Actually shouldn't be needed ?
-	g = g.Normalize(func(path string) string {
-		if strings.HasPrefix(path, "k8s.io/kubernetes/staging/src/") {
-			return strings.TrimPrefix(path, "k8s.io/kubernetes/staging/src/")
-		}
-		return path
-	})
 	i.g = g
 	return g, err
 }

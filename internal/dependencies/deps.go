@@ -240,7 +240,7 @@ MAINLOOP:
 				continue MAINLOOP
 			}
 
-			if strings.HasPrefix(d, k+"/") {
+			if d == k || strings.HasPrefix(d, k+"/") {
 				continue MAINLOOP
 			}
 		}

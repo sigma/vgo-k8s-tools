@@ -271,3 +271,27 @@ func (g *GoModWriter) Write() error {
 
 	return ioutil.WriteFile(filepath.Join(g.RootDir, "go.mod"), b.Bytes(), 0644)
 }
+
+func (c *Converter) GenVendorGo() error {
+	path := c.RootDir
+	fname := filepath.Join(path, "Godeps", "Godeps.json")
+	content, err := ioutil.ReadFile(fname)
+
+	if err != nil {
+		return err
+	}
+
+	var doc convert.Godeps
+	json.Unmarshal(content, &doc)
+
+	var b bytes.Buffer
+	fmt.Fprintln(&b, "package tools")
+	fmt.Fprintln(&b, "// +build tools")
+	fmt.Fprintln(&b, "import (")
+	for _, d := range doc.Deps {
+		fmt.Fprintf(&b, "\t_ \"%s\"\n", d.ImportPath)
+	}
+	fmt.Fprintln(&b, ")")
+
+	return ioutil.WriteFile(filepath.Join(path, "vendor.go"), b.Bytes(), 0644)
+}

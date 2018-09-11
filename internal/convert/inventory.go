@@ -205,7 +205,7 @@ func (i *Inventory) getSubPackages() (map[string][]string, error) {
 			continue
 		}
 		for _, d := range deps {
-			if strings.HasPrefix(d, m.Path) {
+			if d == m.Path || strings.HasPrefix(d, m.Path+"/") {
 				sub := strings.TrimPrefix(d, m.Path)
 				sub = strings.TrimPrefix(sub, "/")
 				subPkgs[m.Path] = append(subPkgs[m.Path], sub)

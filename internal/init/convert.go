@@ -12,16 +12,13 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/sigma/vgo-k8s-tools/internal/convert"
-	"github.com/sigma/vgo-k8s-tools/internal/github"
 )
 
 var (
-	helper *github.RefHelper
-	cache  map[string]string
+	cache map[string]string
 )
 
 func init() {
-	helper = github.NewRefHelper()
 	cache = make(map[string]string)
 }
 
@@ -191,12 +188,11 @@ func getRequirements(path string) []*Requirement {
 			continue
 		}
 
-		ts := helper.GithubCommit(r, d.Rev).VgoTimestamp()
 		maj := "v0"
 		if strings.HasPrefix(r, "gopkg.in") {
 			maj = r[strings.LastIndex(r, ".")+1:]
 		}
-		repos[r] = fmt.Sprintf("%s.0.0-%s-%s", maj, ts, d.Rev[:12])
+		repos[r] = fmt.Sprintf("%s.0.0-00000000000000-%s", maj, d.Rev[:12])
 
 		if d.Comment != "" && isSupportedVgoVersion(d.Comment) {
 			repos[r] = d.Comment

@@ -124,10 +124,13 @@ func (r *VgoRunner) GenVgoMod(mod string) error {
 	fmt.Fprintf(&b, ")\n\n")
 
 	fmt.Fprintln(&b, "replace (")
-	for _, m := range subs {
+	for _, m := range inv.GetSubmodules() {
 		path, err := filepath.Rel(thisMod.Dir, m.Dir)
 		if err != nil {
 			return err
+		}
+		if path == "." {
+			path = "./"
 		}
 		fmt.Fprintln(&b, "\t", m.Path, m.Version, "=>", path)
 	}
